@@ -14,6 +14,16 @@
   <name>feedback-core</name>
   <description>Dominio, casos de uso e adaptadores de saida compartilhados pelas funcoes</description>
 
+  <properties>
+    <!--
+      Este modulo e biblioteca, nao funcao implantavel: nao ha handler nem
+      endpoint a expor. Sem isto, o build nativo gastaria mais de 12 minutos
+      gerando um executavel que ninguem executa. Os @QuarkusTest continuam
+      funcionando, pois a augmentation de teste independe da meta 'build'.
+    -->
+    <quarkus.build.skip>true</quarkus.build.skip>
+  </properties>
+
   <dependencies>
     <dependency>
       <groupId>io.quarkus</groupId>

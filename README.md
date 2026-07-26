@@ -4,10 +4,25 @@ Plataforma serverless de feedback de aulas para o Tech Challenge FIAP (Fase 4): 
 enviam avaliações, administradores recebem notificações automáticas de itens críticos e um
 relatório semanal consolidado por e-mail.
 
-> **Status**: em desenvolvimento incremental. Toda a regra de negócio está pronta — registro e
-> consulta de avaliações com persistência em DynamoDB, classificação de urgência, notificação
-> automática de feedbacks críticos e relatório semanal por e-mail. Faltam a infraestrutura como
-> código, o pipeline de deploy e o build nativo.
+> **Status**: solução completa e publicada na AWS. As três funções rodam como binário nativo
+> GraalVM, com cold start medido em **0,55 s**. Suíte E2E validada contra o ambiente publicado:
+> 17 requisições, 46 asserções, 0 falhas.
+
+## Atendimento aos requisitos
+
+| Requisito do desafio | Onde está | Situação |
+|---|---|---|
+| Ambiente de nuvem configurado e funcionando | [infra/template.yaml](infra/template.yaml) | ✅ publicado |
+| Configurações de segurança dos dados de clientes | [docs/seguranca.md](docs/seguranca.md) | ✅ TLS, criptografia em repouso, escape de HTML |
+| Governança de acesso | [docs/seguranca.md](docs/seguranca.md) | ✅ role por função sem `*`, SSO e OIDC |
+| Componentes de suporte (banco etc.) | DynamoDB + SNS + SES na stack | ✅ |
+| Deploy automatizado dos componentes | [.github/workflows/deploy.yml](.github/workflows/deploy.yml) | ✅ SAM via OIDC |
+| Aplicação monitorada | [docs/monitoramento.md](docs/monitoramento.md) | ✅ logs, 4 alarmes, painel, X-Ray |
+| Notificações automáticas para problemas críticos | `urgent-notification-fn` | ✅ e-mail com descrição, urgência e data |
+| Relatório semanal com média de avaliações | `weekly-report-fn` | ✅ agendado para segunda, 08:00 |
+| Implementar serverless | 3 funções Lambda | ✅ |
+| Rodar em ambiente cloud | AWS | ✅ |
+| Mínimo de 2 funções com responsabilidade única | 3 funções, 1 módulo cada | ✅ |
 
 ## Stack e requisitos
 - Java 21 (bytecode `--release 21`; compila com JDK 21 ou superior), Maven 3.9+ (wrapper `mvnw` incluído)
@@ -28,7 +43,7 @@ Três funções serverless, cada uma com responsabilidade única:
 | `weekly-report-fn` | EventBridge (cron semanal) | Agregar a semana e enviar o relatório por e-mail (SES) |
 
 Avaliações são persistidas no DynamoDB; notas 0–2 são classificadas como urgência `CRITICA`
-e disparam a notificação.
+e disparam a notificação. Decisões de arquitetura e modelo de nuvem: [docs/arquitetura.md](docs/arquitetura.md).
 
 O código segue arquitetura hexagonal (ports & adapters): `domain` concentra as regras de
 negócio sem dependência de framework, `application` orquestra os casos de uso e
@@ -210,8 +225,24 @@ com o environment `postman/feedback-management-api.environment.json`.
 - Nenhuma credencial no código: configuração por variáveis de ambiente e parâmetros da stack.
 - Detalhes e limitações conhecidas: [docs/seguranca.md](docs/seguranca.md)
 
+## Vídeo de demonstração
+Roteiro sugerido, com os comandos prontos: [docs/roteiro-do-video.md](docs/roteiro-do-video.md)
+
 ## Troubleshooting
 - **Build nativo falhando local**: use o build em container — `./mvnw package -Dnative` (o profile
   `native` já ativa `quarkus.native.container-build`, dispensando o GraalVM instalado na máquina).
+  Com menos de 4 GB no Docker, acrescente `-Dquarkus.native.native-image-xmx=3g`.
+- **`No serializer found` só no nativo**: a classe precisa de `@RegisterForReflection`. O Quarkus
+  registra automaticamente apenas os tipos alcançáveis pela camada REST; o que é serializado
+  direto pelo `ObjectMapper` precisa ser declarado.
+- **404 do Quarkus na API publicada**: o stage do API Gateway precisa ser `$default`. Um stage
+  nomeado entra no path que chega à aplicação e nenhuma rota casa.
 - **SES não envia e-mail**: conta em sandbox — verifique remetente e destinatários (`aws ses verify-email-identity`).
 - **Testcontainers sem Docker**: garanta o Docker Desktop ativo antes do `./mvnw verify`.
+
+## Encerrando o ambiente
+Ao final da demonstração, para não consumir créditos:
+
+```bash
+cd infra && sam delete --stack-name feedback-management
+```

@@ -21,7 +21,10 @@ concurrency:
 jobs:
   deploy:
     name: Build nativo e deploy
-    runs-on: ubuntu-latest
+    # Runner ARM: as funcoes rodam em Lambda arm64 (Graviton), e o binario nativo
+    # e especifico de arquitetura. Compilar em x86_64 geraria um artefato que o
+    # Lambda nao consegue executar.
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 60
 
     steps:
