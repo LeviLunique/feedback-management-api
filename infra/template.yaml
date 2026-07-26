@@ -1,0 +1,280 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Feedback Management API - Tech Challenge FIAP Fase 4.
+  Plataforma serverless de feedback de aulas: ingestao via API Gateway, notificacao
+  de itens criticos e relatorio semanal, com tres funcoes Lambda de responsabilidade unica.
+
+Parameters:
+  SenderEmail:
+    Type: String
+    Description: Endereco remetente verificado no Amazon SES.
+    AllowedPattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+    ConstraintDescription: Informe um endereco de e-mail valido.
+  AdminEmails:
+    Type: String
+    Description: Destinatarios das notificacoes e do relatorio, separados por virgula.
+  ApiThrottleRate:
+    Type: Number
+    Default: 20
+    MinValue: 1
+    Description: Requisicoes por segundo aceitas pelo API Gateway.
+  ApiThrottleBurst:
+    Type: Number
+    Default: 40
+    MinValue: 1
+    Description: Pico de requisicoes aceito pelo API Gateway.
+  RetencaoDeLogsEmDias:
+    Type: Number
+    Default: 14
+    AllowedValues: [1, 3, 5, 7, 14, 30, 60, 90]
+    Description: Retencao dos logs no CloudWatch.
+
+Globals:
+  Function:
+    # Binario nativo GraalVM sobre custom runtime: cold start baixo e sem JVM.
+    Runtime: provided.al2023
+    Handler: not.used.in.provided.runtime
+    Architectures: [arm64]
+    MemorySize: 256
+    Timeout: 30
+    Tracing: Active
+    Environment:
+      Variables:
+        # AWS_REGION e reservado pelo Lambda e injetado automaticamente:
+        # declara-lo aqui faz o deploy falhar.
+        FEEDBACK_TABLE: !Ref FeedbackTable
+    Tags:
+      Projeto: tech-challenge-fase-4
+      Ambiente: !Ref AWS::StackName
+
+Resources:
+
+  # ---------------------------------------------------------------------------
+  # Dados
+  # ---------------------------------------------------------------------------
+  FeedbackTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${AWS::StackName}-feedback'
+      # Sob demanda: escala a zero e nao cobra capacidade ociosa.
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+        - AttributeName: dataEnvioDia
+          AttributeType: S
+        - AttributeName: dataEnvio
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        # Consulta por periodo sem Scan: particao por dia, ordenada pelo instante.
+        - IndexName: gsi-data
+          KeySchema:
+            - AttributeName: dataEnvioDia
+              KeyType: HASH
+            - AttributeName: dataEnvio
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      SSESpecification:
+        # Criptografia em repouso dos dados de avaliacao dos alunos.
+        SSEEnabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      Tags:
+        - Key: Projeto
+          Value: tech-challenge-fase-4
+
+  # ---------------------------------------------------------------------------
+  # Mensageria: desacopla a ingestao do envio de e-mail
+  # ---------------------------------------------------------------------------
+  FeedbackCriticoTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub '${AWS::StackName}-feedback-critico'
+      DisplayName: Feedback critico
+      # Chave gerenciada pela AWS: criptografia em repouso sem custo adicional.
+      KmsMasterKeyId: alias/aws/sns
+      Tags:
+        - Key: Projeto
+          Value: tech-challenge-fase-4
+
+  # ---------------------------------------------------------------------------
+  # API HTTP (payload v2), com limite de requisicoes e log de acesso
+  # ---------------------------------------------------------------------------
+  FeedbackHttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: v1
+      DefaultRouteSettings:
+        ThrottlingRateLimit: !Ref ApiThrottleRate
+        ThrottlingBurstLimit: !Ref ApiThrottleBurst
+      AccessLogSettings:
+        DestinationArn: !GetAtt ApiAccessLogGroup.Arn
+        # Sem corpo de requisicao no log: evita registrar texto do aluno.
+        Format: >-
+          {"requestId":"$context.requestId","ip":"$context.identity.sourceIp",
+          "requestTime":"$context.requestTime","httpMethod":"$context.httpMethod",
+          "routeKey":"$context.routeKey","status":"$context.status",
+          "protocol":"$context.protocol","responseLength":"$context.responseLength",
+          "integrationLatency":"$context.integrationLatency"}
+
+  ApiAccessLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/apigateway/${AWS::StackName}'
+      RetentionInDays: !Ref RetencaoDeLogsEmDias
+
+  # ---------------------------------------------------------------------------
+  # Funcao 1: ingestao e consulta (feedback-intake-fn)
+  # ---------------------------------------------------------------------------
+  IntakeFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-feedback-intake-fn'
+      Description: Recebe, valida e persiste avaliacoes; publica as criticas e serve consultas.
+      CodeUri: ../feedback-api/target/function.zip
+      Environment:
+        Variables:
+          FEEDBACK_TABLE: !Ref FeedbackTable
+          FEEDBACK_CRITICO_TOPIC_ARN: !Ref FeedbackCriticoTopic
+      Events:
+        RaizDaApi:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref FeedbackHttpApi
+            Path: /
+            Method: ANY
+        RotasDaApi:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref FeedbackHttpApi
+            Path: /{proxy+}
+            Method: ANY
+      Policies:
+        # Menor privilegio: grava e consulta apenas a propria tabela.
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:PutItem
+                - dynamodb:Query
+              Resource:
+                - !GetAtt FeedbackTable.Arn
+                - !Sub '${FeedbackTable.Arn}/index/gsi-data'
+            - Effect: Allow
+              Action: sns:Publish
+              Resource: !Ref FeedbackCriticoTopic
+
+  IntakeLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${AWS::StackName}-feedback-intake-fn'
+      RetentionInDays: !Ref RetencaoDeLogsEmDias
+
+  # ---------------------------------------------------------------------------
+  # Funcao 2: notificacao de feedbacks criticos (urgent-notification-fn)
+  # ---------------------------------------------------------------------------
+  NotificationFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-urgent-notification-fn'
+      Description: Consome o topico de feedbacks criticos e avisa os administradores por e-mail.
+      CodeUri: ../feedback-notification/target/function.zip
+      Environment:
+        Variables:
+          SENDER_EMAIL: !Ref SenderEmail
+          ADMIN_EMAILS: !Ref AdminEmails
+      Events:
+        FeedbackCritico:
+          Type: SNS
+          Properties:
+            Topic: !Ref FeedbackCriticoTopic
+      Policies:
+        # So pode enviar e-mail, e apenas como o remetente verificado.
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - ses:SendEmail
+                - ses:SendRawEmail
+              Resource: !Sub 'arn:${AWS::Partition}:ses:${AWS::Region}:${AWS::AccountId}:identity/${SenderEmail}'
+              Condition:
+                StringEquals:
+                  ses:FromAddress: !Ref SenderEmail
+
+  NotificationLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${AWS::StackName}-urgent-notification-fn'
+      RetentionInDays: !Ref RetencaoDeLogsEmDias
+
+  # ---------------------------------------------------------------------------
+  # Funcao 3: relatorio semanal (weekly-report-fn)
+  # ---------------------------------------------------------------------------
+  ReportFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-weekly-report-fn'
+      Description: Agrega a semana encerrada e envia o relatorio aos administradores.
+      CodeUri: ../feedback-report/target/function.zip
+      Timeout: 60
+      Environment:
+        Variables:
+          FEEDBACK_TABLE: !Ref FeedbackTable
+          SENDER_EMAIL: !Ref SenderEmail
+          ADMIN_EMAILS: !Ref AdminEmails
+      Events:
+        RelatorioSemanal:
+          Type: ScheduleV2
+          Properties:
+            # Segunda-feira as 08:00 (Brasilia); reporta a semana que acabou de terminar.
+            ScheduleExpression: 'cron(0 8 ? * MON *)'
+            ScheduleExpressionTimezone: America/Sao_Paulo
+            Description: Dispara o relatorio semanal de feedbacks.
+      Policies:
+        # Somente leitura da tabela: o relatorio nunca altera dados.
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action: dynamodb:Query
+              Resource:
+                - !GetAtt FeedbackTable.Arn
+                - !Sub '${FeedbackTable.Arn}/index/gsi-data'
+            - Effect: Allow
+              Action:
+                - ses:SendEmail
+                - ses:SendRawEmail
+              Resource: !Sub 'arn:${AWS::Partition}:ses:${AWS::Region}:${AWS::AccountId}:identity/${SenderEmail}'
+              Condition:
+                StringEquals:
+                  ses:FromAddress: !Ref SenderEmail
+
+  ReportLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${AWS::StackName}-weekly-report-fn'
+      RetentionInDays: !Ref RetencaoDeLogsEmDias
+
+Outputs:
+  ApiUrl:
+    Description: URL base da API (use como BASE_URL nos testes Postman).
+    Value: !Sub 'https://${FeedbackHttpApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}/v1'
+  NomeDaTabela:
+    Description: Tabela DynamoDB de avaliacoes.
+    Value: !Ref FeedbackTable
+  TopicoDeFeedbackCritico:
+    Description: Topico SNS que dispara a notificacao de urgencia.
+    Value: !Ref FeedbackCriticoTopic
+  FuncaoDeIngestao:
+    Description: Funcao que atende a API.
+    Value: !Ref IntakeFunction
+  FuncaoDeNotificacao:
+    Description: Funcao acionada pelo topico de feedbacks criticos.
+    Value: !Ref NotificationFunction
+  FuncaoDeRelatorio:
+    Description: Funcao agendada do relatorio semanal.
+    Value: !Ref ReportFunction

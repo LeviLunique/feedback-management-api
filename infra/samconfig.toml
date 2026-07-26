@@ -1,0 +1,19 @@
+version = 0.1
+
+# Os parametros SenderEmail e AdminEmails NAO ficam aqui de proposito: sao dados
+# de ambiente e entram pela linha de comando, a partir das variaveis exportadas
+# na sessao. Ver README, secao "Deploy na AWS".
+
+[default.deploy.parameters]
+stack_name = "feedback-management"
+region = "us-east-1"
+capabilities = "CAPABILITY_IAM"
+# Deixa o SAM criar e reutilizar o bucket de artefatos.
+resolve_s3 = true
+confirm_changeset = true
+fail_on_empty_changeset = false
+tags = "Projeto=\"tech-challenge-fase-4\""
+
+[default.delete.parameters]
+stack_name = "feedback-management"
+region = "us-east-1"

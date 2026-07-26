@@ -71,16 +71,41 @@ Relatórios em `<módulo>/target/site/jacoco/index.html`.
 Os testes de integração usam Testcontainers com LocalStack — nenhuma chamada atinge a AWS.
 
 ### Deploy na AWS
+
+Toda a infraestrutura está declarada em [infra/template.yaml](infra/template.yaml) (AWS SAM):
+tabela DynamoDB com índice, tópico SNS, API HTTP com throttling, as três funções Lambda com
+uma role de menor privilégio cada, o agendamento semanal e os grupos de log.
+
 ```bash
-sam build && sam deploy --guided   # primeira vez; depois: sam deploy
+export AWS_PROFILE=fiap
+export SENDER_EMAIL="seu-email-verificado@exemplo.com"
+export ADMIN_EMAILS="seu-email-verificado@exemplo.com"
+
+./mvnw package -Dnative                       # gera os function.zip nativos
+cd infra && sam deploy \
+  --parameter-overrides "SenderEmail=$SENDER_EMAIL AdminEmails=$ADMIN_EMAILS"
 ```
-O push em `main` também dispara o deploy automatizado via GitHub Actions.
-> Disponível a partir da entrega de infraestrutura como código; veja o *Status* no topo.
+
+O `samconfig.toml` já fixa nome da stack, região e capabilities — os e-mails entram pela linha
+de comando justamente para não ficarem versionados.
+
+Para conferir o que mudaria antes de aplicar, acrescente `--no-execute-changeset`.
+Ao final da demonstração, `sam delete` remove a stack inteira.
+
+Saídas úteis após o deploy (`ApiUrl`, `NomeDaTabela`, `TopicoDeFeedbackCritico`) aparecem no
+terminal e podem ser consultadas com:
+
+```bash
+aws cloudformation describe-stacks --stack-name feedback-management --query 'Stacks[0].Outputs'
+```
 
 ### Variáveis de ambiente principais
-- `AWS_PROFILE`, `AWS_REGION` — credenciais/região do deploy
+- `AWS_PROFILE` — perfil autenticado via SSO (`aws sso login --profile fiap`)
 - `SENDER_EMAIL` — remetente verificado no SES
 - `ADMIN_EMAILS` — destinatários das notificações e do relatório semanal
+
+Em execução na AWS, `FEEDBACK_TABLE`, `FEEDBACK_CRITICO_TOPIC_ARN` e `AWS_REGION` são injetadas
+automaticamente pelo CloudFormation e pelo próprio Lambda — não precisam ser definidas à mão.
 
 ## Endpoints
 
@@ -162,10 +187,15 @@ com o environment `postman/feedback-management-api.environment.json`.
 - Health check em `/q/health` expõe o nome e a versão da build ativa em cada função.
 
 ## Segurança e governança
-- IAM com menor privilégio por função (uma role por Lambda, sem `*`).
-- Deploy do CI via OIDC (sem access keys de longa duração).
-- TLS no API Gateway, criptografia em repouso no DynamoDB, throttling de requisições.
+- IAM com menor privilégio por função: uma role por Lambda, sem `*` em ação ou recurso.
+  A função de relatório, por exemplo, tem apenas `dynamodb:Query` — não consegue alterar dados.
+- Envio de e-mail restrito por condição `ses:FromAddress`, impedindo a função de se passar por
+  outro remetente mesmo que o código tente.
+- TLS obrigatório no API Gateway, criptografia em repouso no DynamoDB e no SNS,
+  Point-in-Time Recovery na tabela e throttling de requisições.
+- Log de acesso do API Gateway sem corpo de requisição: o texto do aluno não vai para o log.
 - Nenhuma credencial no código: configuração por variáveis de ambiente e parâmetros da stack.
+- Detalhes e limitações conhecidas: [docs/seguranca.md](docs/seguranca.md)
 
 ## Troubleshooting
 - **Build nativo falhando local**: use o build em container — `./mvnw package -Dnative` (o profile
