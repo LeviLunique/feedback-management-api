@@ -7,8 +7,20 @@
   <groupId>br.com.fiap</groupId>
   <artifactId>feedback-management-api</artifactId>
   <version>1.0.0-SNAPSHOT</version>
+  <packaging>pom</packaging>
   <name>feedback-management-api</name>
   <description>Plataforma serverless de feedback de aulas - Tech Challenge FIAP Fase 4</description>
+
+  <!--
+    Um artefato Quarkus aceita OU a extensao HTTP (API Gateway) OU handlers Lambda
+    customizados, nunca as duas. Cada funcao serverless e, portanto, um modulo
+    proprio - o que tambem materializa a responsabilidade unica por componente.
+  -->
+  <modules>
+    <module>feedback-core</module>
+    <module>feedback-api</module>
+    <module>feedback-notification</module>
+  </modules>
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -48,51 +60,16 @@
         <type>pom</type>
         <scope>import</scope>
       </dependency>
+      <dependency>
+        <groupId>br.com.fiap</groupId>
+        <artifactId>feedback-core</artifactId>
+        <version>${project.version}</version>
+      </dependency>
     </dependencies>
   </dependencyManagement>
 
   <dependencies>
-    <!-- API REST -->
-    <dependency>
-      <groupId>io.quarkus</groupId>
-      <artifactId>quarkus-rest-jackson</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>io.quarkus</groupId>
-      <artifactId>quarkus-hibernate-validator</artifactId>
-    </dependency>
-
-    <!-- Execucao como AWS Lambda atras do API Gateway HTTP API (payload v2) -->
-    <dependency>
-      <groupId>io.quarkus</groupId>
-      <artifactId>quarkus-amazon-lambda-http</artifactId>
-    </dependency>
-
-    <!-- Persistencia serverless -->
-    <dependency>
-      <groupId>io.quarkiverse.amazonservices</groupId>
-      <artifactId>quarkus-amazon-dynamodb</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>software.amazon.awssdk</groupId>
-      <artifactId>url-connection-client</artifactId>
-    </dependency>
-
-    <!-- Observabilidade e documentacao -->
-    <dependency>
-      <groupId>io.quarkus</groupId>
-      <artifactId>quarkus-smallrye-health</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>io.quarkus</groupId>
-      <artifactId>quarkus-smallrye-openapi</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>io.quarkus</groupId>
-      <artifactId>quarkus-logging-json</artifactId>
-    </dependency>
-
-    <!-- Testes -->
+    <!-- Comuns a todos os modulos -->
     <dependency>
       <groupId>io.quarkus</groupId>
       <artifactId>quarkus-junit</artifactId>
@@ -106,11 +83,6 @@
     <dependency>
       <groupId>io.quarkus</groupId>
       <artifactId>quarkus-jacoco</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>io.rest-assured</groupId>
-      <artifactId>rest-assured</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
@@ -181,7 +153,7 @@
         </executions>
       </plugin>
 
-      <!-- Cobertura de testes com gate de 80% de linhas -->
+      <!-- Cobertura de testes com gate de 80% de linhas, aplicado por modulo -->
       <plugin>
         <groupId>org.jacoco</groupId>
         <artifactId>jacoco-maven-plugin</artifactId>

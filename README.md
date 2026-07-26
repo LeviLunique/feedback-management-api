@@ -4,10 +4,10 @@ Plataforma serverless de feedback de aulas para o Tech Challenge FIAP (Fase 4): 
 enviam avaliações, administradores recebem notificações automáticas de itens críticos e um
 relatório semanal consolidado por e-mail.
 
-> **Status**: em desenvolvimento incremental. Já estão prontos a fundação do projeto (build,
-> testes, cobertura, health check e OpenAPI) e o registro de avaliações com classificação de
-> urgência; a persistência em DynamoDB, as notificações e o relatório semanal vêm nas próximas
-> entregas. A seção *Endpoints* indica o que já responde.
+> **Status**: em desenvolvimento incremental. Já estão prontos o registro e a consulta de
+> avaliações com persistência em DynamoDB, a classificação de urgência e a notificação
+> automática de feedbacks críticos por e-mail; o relatório semanal, a infraestrutura como
+> código e o pipeline de deploy vêm nas próximas entregas.
 
 ## Stack e requisitos
 - Java 21 (bytecode `--release 21`; compila com JDK 21 ou superior), Maven 3.9+ (wrapper `mvnw` incluído)
@@ -30,27 +30,44 @@ Três funções serverless, cada uma com responsabilidade única:
 Avaliações são persistidas no DynamoDB; notas 0–2 são classificadas como urgência `CRITICA`
 e disparam a notificação.
 
-O código segue arquitetura hexagonal (ports & adapters) em módulo único: `domain` concentra
-as regras de negócio sem dependência de framework, `application` orquestra os casos de uso e
+O código segue arquitetura hexagonal (ports & adapters): `domain` concentra as regras de
+negócio sem dependência de framework, `application` orquestra os casos de uso e
 `adapter.in` / `adapter.out` isolam HTTP, DynamoDB, SNS e SES.
+
+Cada função serverless é um módulo Maven com seu próprio artefato de deploy:
+
+| Módulo | Função | Papel |
+|---|---|---|
+| `feedback-core` | — | Domínio, casos de uso e adaptadores de saída, compartilhados |
+| `feedback-api` | `feedback-intake-fn` | Recursos REST atrás do API Gateway |
+| `feedback-notification` | `urgent-notification-fn` | Consome o tópico SNS e envia o e-mail de urgência |
+
+A separação é imposta pelo Quarkus, que não permite a extensão HTTP e um handler Lambda
+customizado no mesmo artefato — e coincide com a responsabilidade única exigida no desafio.
 
 ## Como executar
 
 ### Dev local
 ```bash
-./mvnw quarkus:dev
+./mvnw install -DskipTests
+./mvnw -pl feedback-api quarkus:dev
 ```
 Aplicação em `http://localhost:8080` (health em `/q/health`, Swagger em `/q/swagger-ui`).
-O Quarkus sobe automaticamente um container com DynamoDB via Dev Services e cria a tabela —
-não é preciso nenhuma credencial AWS para desenvolver ou rodar os testes, só o Docker ativo.
+O primeiro comando publica o `feedback-core` no repositório local; depois disso basta o segundo.
+
+O Quarkus sobe automaticamente um container (LocalStack) via Dev Services e provisiona tabela,
+tópico e identidades de e-mail — não é preciso nenhuma credencial AWS para desenvolver ou
+rodar os testes, só o Docker ativo.
 
 ### Testes e qualidade
 ```bash
 ./mvnw verify
 ```
-Executa os testes unitários e de integração e aplica o gate de cobertura do JaCoCo: o build
-**falha** se a cobertura de linhas ficar abaixo de 80%. Relatório em
-`target/site/jacoco/index.html`.
+Executa os testes unitários e de integração de todos os módulos e aplica o gate de cobertura
+do JaCoCo por módulo: o build **falha** se a cobertura de linhas ficar abaixo de 80%.
+Relatórios em `<módulo>/target/site/jacoco/index.html`.
+
+Os testes de integração usam Testcontainers com LocalStack — nenhuma chamada atinge a AWS.
 
 ### Deploy na AWS
 ```bash
