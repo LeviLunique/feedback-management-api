@@ -1,0 +1,151 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Role assumida pelo GitHub Actions via OIDC para publicar a stack da Feedback Management API.
+  Stack de bootstrap: aplicada uma unica vez, manualmente, antes do primeiro deploy automatico.
+  Nao guarda credencial alguma - o GitHub troca um token de identidade por credenciais temporarias.
+
+Parameters:
+  GitHubRepo:
+    Type: String
+    Description: 'Repositorio no formato dono/nome, por exemplo LeviLunique/feedback-management-api'
+    AllowedPattern: '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$'
+  BranchDeDeploy:
+    Type: String
+    Default: main
+    Description: Unico branch autorizado a assumir a role.
+  NomeDaStackDaAplicacao:
+    Type: String
+    Default: feedback-management
+    Description: Prefixo dos recursos que esta role pode administrar.
+  CriarProvedorOidc:
+    Type: String
+    Default: 'nao'
+    AllowedValues: ['sim', 'nao']
+    Description: >
+      Use 'sim' apenas em conta que ainda nao possui o provedor OIDC do GitHub.
+      Criar um segundo provedor para o mesmo emissor falha.
+
+Conditions:
+  DeveCriarProvedor: !Equals [!Ref CriarProvedorOidc, 'sim']
+
+Resources:
+
+  ProvedorOidcDoGitHub:
+    Type: AWS::IAM::OIDCProvider
+    Condition: DeveCriarProvedor
+    Properties:
+      Url: https://token.actions.githubusercontent.com
+      ClientIdList:
+        - sts.amazonaws.com
+
+  RoleDeDeploy:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${NomeDaStackDaAplicacao}-github-deploy'
+      Description: Publica a stack da aplicacao a partir do GitHub Actions.
+      MaxSessionDuration: 3600
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com'
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                # Confia apenas neste repositorio e neste branch: um fork ou outro
+                # branch do mesmo repositorio nao consegue assumir a role.
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+                token.actions.githubusercontent.com:sub: !Sub 'repo:${GitHubRepo}:ref:refs/heads/${BranchDeDeploy}'
+      Policies:
+        - PolicyName: publicar-stack-da-aplicacao
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              # CloudFormation limitado as stacks do projeto.
+              - Effect: Allow
+                Action:
+                  - cloudformation:CreateStack
+                  - cloudformation:UpdateStack
+                  - cloudformation:DeleteStack
+                  - cloudformation:DescribeStacks
+                  - cloudformation:DescribeStackEvents
+                  - cloudformation:DescribeStackResource
+                  - cloudformation:DescribeStackResources
+                  - cloudformation:GetTemplateSummary
+                  - cloudformation:CreateChangeSet
+                  - cloudformation:DescribeChangeSet
+                  - cloudformation:ExecuteChangeSet
+                  - cloudformation:DeleteChangeSet
+                  - cloudformation:ListStackResources
+                  - cloudformation:GetTemplate
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${NomeDaStackDaAplicacao}/*'
+                  - !Sub 'arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${NomeDaStackDaAplicacao}-*/*'
+              - Effect: Allow
+                Action: cloudformation:ValidateTemplate
+                Resource: '*'
+              # O transform do SAM roda como uma transformacao gerenciada da AWS.
+              - Effect: Allow
+                Action:
+                  - cloudformation:CreateChangeSet
+                  - cloudformation:DescribeChangeSet
+                Resource: !Sub 'arn:${AWS::Partition}:cloudformation:${AWS::Region}:aws:transform/Serverless-2016-10-31'
+              # Bucket de artefatos gerenciado pelo proprio SAM.
+              - Effect: Allow
+                Action:
+                  - s3:CreateBucket
+                  - s3:GetBucketLocation
+                  - s3:GetBucketPolicy
+                  - s3:PutBucketPolicy
+                  - s3:PutBucketTagging
+                  - s3:PutBucketVersioning
+                  - s3:PutEncryptionConfiguration
+                  - s3:PutBucketPublicAccessBlock
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:ListBucket
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:s3:::aws-sam-cli-managed-*'
+                  - !Sub 'arn:${AWS::Partition}:s3:::aws-sam-cli-managed-*/*'
+              # Roles das funcoes: o CloudFormation as nomeia com o prefixo da stack,
+              # o que permite limitar a permissao mais sensivel do pipeline.
+              - Effect: Allow
+                Action:
+                  - iam:CreateRole
+                  - iam:DeleteRole
+                  - iam:GetRole
+                  - iam:PassRole
+                  - iam:TagRole
+                  - iam:UntagRole
+                  - iam:AttachRolePolicy
+                  - iam:DetachRolePolicy
+                  - iam:PutRolePolicy
+                  - iam:DeleteRolePolicy
+                  - iam:GetRolePolicy
+                  - iam:ListRolePolicies
+                  - iam:ListAttachedRolePolicies
+                Resource: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/${NomeDaStackDaAplicacao}-*'
+              # Servicos que compoem a stack.
+              - Effect: Allow
+                Action:
+                  - lambda:*
+                  - apigateway:*
+                  - dynamodb:CreateTable
+                  - dynamodb:DeleteTable
+                  - dynamodb:DescribeTable
+                  - dynamodb:UpdateTable
+                  - dynamodb:UpdateContinuousBackups
+                  - dynamodb:DescribeContinuousBackups
+                  - dynamodb:TagResource
+                  - dynamodb:ListTagsOfResource
+                  - sns:*
+                  - scheduler:*
+                  - logs:*
+                  - cloudwatch:*
+                Resource: '*'
+
+Outputs:
+  RoleArn:
+    Description: Valor do segredo AWS_ROLE_ARN no GitHub.
+    Value: !GetAtt RoleDeDeploy.Arn

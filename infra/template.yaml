@@ -14,6 +14,13 @@ Parameters:
   AdminEmails:
     Type: String
     Description: Destinatarios das notificacoes e do relatorio, separados por virgula.
+  AlertEmail:
+    Type: String
+    Description: >
+      Endereco que recebe os alarmes operacionais. Diferente de AdminEmails de proposito:
+      um trata de negocio (feedbacks), o outro de saude da aplicacao.
+    AllowedPattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+    ConstraintDescription: Informe um endereco de e-mail valido.
   ApiThrottleRate:
     Type: Number
     Default: 20
@@ -259,6 +266,172 @@ Resources:
       LogGroupName: !Sub '/aws/lambda/${AWS::StackName}-weekly-report-fn'
       RetentionInDays: !Ref RetencaoDeLogsEmDias
 
+  # ---------------------------------------------------------------------------
+  # Monitoramento: alarmes e painel
+  # ---------------------------------------------------------------------------
+  OpsAlertsTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub '${AWS::StackName}-ops-alerts'
+      DisplayName: Alertas operacionais
+      KmsMasterKeyId: alias/aws/sns
+      Subscription:
+        # A AWS envia um e-mail de confirmacao; o alarme so chega apos o aceite.
+        - Protocol: email
+          Endpoint: !Ref AlertEmail
+
+  IntakeErrosAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${AWS::StackName}-intake-erros'
+      AlarmDescription: A funcao de ingestao falhou ao registrar avaliacoes.
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref IntakeFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      # Sem invocacoes nao ha falha: periodo vazio nao deve disparar alarme.
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref OpsAlertsTopic]
+      OKActions: [!Ref OpsAlertsTopic]
+
+  NotificationErrosAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${AWS::StackName}-notificacao-erros'
+      AlarmDescription: Falha no envio da notificacao de feedback critico.
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref NotificationFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref OpsAlertsTopic]
+      OKActions: [!Ref OpsAlertsTopic]
+
+  ReportErrosAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${AWS::StackName}-relatorio-erros'
+      AlarmDescription: Falha na geracao ou no envio do relatorio semanal.
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref ReportFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref OpsAlertsTopic]
+      OKActions: [!Ref OpsAlertsTopic]
+
+  ApiErroServidorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${AWS::StackName}-api-5xx'
+      AlarmDescription: A API respondeu com erro de servidor aos estudantes.
+      Namespace: AWS/ApiGateway
+      MetricName: 5xx
+      Dimensions:
+        - Name: ApiId
+          Value: !Ref FeedbackHttpApi
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref OpsAlertsTopic]
+      OKActions: [!Ref OpsAlertsTopic]
+
+  PainelDeMonitoramento:
+    Type: AWS::CloudWatch::Dashboard
+    Properties:
+      DashboardName: !Sub '${AWS::StackName}-monitoramento'
+      DashboardBody: !Sub |
+        {
+          "widgets": [
+            {
+              "type": "metric", "x": 0, "y": 0, "width": 12, "height": 6,
+              "properties": {
+                "title": "Invocacoes por funcao",
+                "region": "${AWS::Region}",
+                "stat": "Sum", "period": 300, "view": "timeSeries",
+                "metrics": [
+                  [ "AWS/Lambda", "Invocations", "FunctionName", "${IntakeFunction}", { "label": "ingestao" } ],
+                  [ "...", "${NotificationFunction}", { "label": "notificacao" } ],
+                  [ "...", "${ReportFunction}", { "label": "relatorio" } ]
+                ]
+              }
+            },
+            {
+              "type": "metric", "x": 12, "y": 0, "width": 12, "height": 6,
+              "properties": {
+                "title": "Erros por funcao",
+                "region": "${AWS::Region}",
+                "stat": "Sum", "period": 300, "view": "timeSeries",
+                "metrics": [
+                  [ "AWS/Lambda", "Errors", "FunctionName", "${IntakeFunction}", { "label": "ingestao" } ],
+                  [ "...", "${NotificationFunction}", { "label": "notificacao" } ],
+                  [ "...", "${ReportFunction}", { "label": "relatorio" } ]
+                ]
+              }
+            },
+            {
+              "type": "metric", "x": 0, "y": 6, "width": 12, "height": 6,
+              "properties": {
+                "title": "Duracao p95 (ms)",
+                "region": "${AWS::Region}",
+                "stat": "p95", "period": 300, "view": "timeSeries",
+                "metrics": [
+                  [ "AWS/Lambda", "Duration", "FunctionName", "${IntakeFunction}", { "label": "ingestao" } ],
+                  [ "...", "${NotificationFunction}", { "label": "notificacao" } ],
+                  [ "...", "${ReportFunction}", { "label": "relatorio" } ]
+                ]
+              }
+            },
+            {
+              "type": "metric", "x": 12, "y": 6, "width": 12, "height": 6,
+              "properties": {
+                "title": "DynamoDB: capacidade consumida",
+                "region": "${AWS::Region}",
+                "stat": "Sum", "period": 300, "view": "timeSeries",
+                "metrics": [
+                  [ "AWS/DynamoDB", "ConsumedWriteCapacityUnits", "TableName", "${FeedbackTable}", { "label": "gravacoes" } ],
+                  [ ".", "ConsumedReadCapacityUnits", ".", ".", { "label": "leituras" } ]
+                ]
+              }
+            },
+            {
+              "type": "metric", "x": 0, "y": 12, "width": 24, "height": 6,
+              "properties": {
+                "title": "API Gateway: requisicoes, erros e latencia",
+                "region": "${AWS::Region}",
+                "period": 300, "view": "timeSeries",
+                "metrics": [
+                  [ "AWS/ApiGateway", "Count", "ApiId", "${FeedbackHttpApi}", { "stat": "Sum", "label": "requisicoes" } ],
+                  [ ".", "4xx", ".", ".", { "stat": "Sum", "label": "erros do cliente" } ],
+                  [ ".", "5xx", ".", ".", { "stat": "Sum", "label": "erros do servidor" } ],
+                  [ ".", "Latency", ".", ".", { "stat": "p95", "label": "latencia p95" } ]
+                ]
+              }
+            }
+          ]
+        }
+
 Outputs:
   ApiUrl:
     Description: URL base da API (use como BASE_URL nos testes Postman).
@@ -278,3 +451,9 @@ Outputs:
   FuncaoDeRelatorio:
     Description: Funcao agendada do relatorio semanal.
     Value: !Ref ReportFunction
+  TopicoDeAlertas:
+    Description: Topico SNS que recebe os alarmes operacionais.
+    Value: !Ref OpsAlertsTopic
+  PainelCloudWatch:
+    Description: URL do painel de monitoramento.
+    Value: !Sub 'https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=${AWS::StackName}-monitoramento'

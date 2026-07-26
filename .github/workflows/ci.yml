@@ -1,0 +1,52 @@
+name: CI
+
+# Valida toda proposta de mudanca antes do merge. Os testes de integracao usam
+# Testcontainers com LocalStack, entao nenhuma credencial da AWS e necessaria.
+on:
+  pull_request:
+  push:
+    branches-ignore:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build, testes e cobertura
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Obter o codigo
+        uses: actions/checkout@v4
+
+      - name: Preparar o JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Build, testes e gate de cobertura
+        # O proprio verify falha se a cobertura de linhas ficar abaixo de 80%.
+        run: ./mvnw -B --no-transfer-progress verify
+
+      - name: Publicar relatorios de cobertura
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cobertura-jacoco
+          path: '*/target/site/jacoco/'
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Publicar resultados de teste
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: relatorios-de-teste
+          path: '*/target/surefire-reports/'
+          if-no-files-found: warn
+          retention-days: 7

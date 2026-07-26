@@ -81,9 +81,11 @@ export AWS_PROFILE=fiap
 export SENDER_EMAIL="seu-email-verificado@exemplo.com"
 export ADMIN_EMAILS="seu-email-verificado@exemplo.com"
 
+export ALERT_EMAIL="seu-email-verificado@exemplo.com"
+
 ./mvnw package -Dnative                       # gera os function.zip nativos
 cd infra && sam deploy \
-  --parameter-overrides "SenderEmail=$SENDER_EMAIL AdminEmails=$ADMIN_EMAILS"
+  --parameter-overrides "SenderEmail=$SENDER_EMAIL AdminEmails=$ADMIN_EMAILS AlertEmail=$ALERT_EMAIL"
 ```
 
 O `samconfig.toml` já fixa nome da stack, região e capabilities — os e-mails entram pela linha
@@ -181,10 +183,21 @@ com o environment `postman/feedback-management-api.environment.json`.
   Para trocar a imagem: `NEWMAN_IMAGE=postman/newman:alpine ./scripts/run-postman.sh`.
 
 ## Monitoramento
-- Logs estruturados (JSON) no CloudWatch Logs, retenção de 14 dias.
-- Alarmes de erro por função e 5XX do API Gateway com notificação por e-mail.
-- Dashboard CloudWatch com invocações, erros e duração p95.
+- Logs estruturados (JSON) no CloudWatch Logs, com retenção de 14 dias e um grupo por função.
+- Quatro alarmes — erro em cada função e 5xx no API Gateway — publicando em um tópico SNS que
+  envia e-mail. Avisam também quando o problema se resolve.
+- Dashboard CloudWatch com invocações, erros, duração p95, capacidade do DynamoDB e latência da API.
+- Rastreamento distribuído com AWS X-Ray habilitado nas três funções.
 - Health check em `/q/health` expõe o nome e a versão da build ativa em cada função.
+- Detalhes e consultas úteis: [docs/monitoramento.md](docs/monitoramento.md)
+
+## Integração e entrega contínua
+- `ci.yml`: build, testes e gate de cobertura em todo pull request — sem precisar de credenciais
+  da AWS, já que os testes de integração rodam em LocalStack.
+- `deploy.yml`: no merge para `main`, compila as funções em binário nativo e publica a stack.
+- Autenticação por **OIDC**, sem access key armazenada. A confiança é restrita a este
+  repositório e ao branch `main`.
+- Configuração inicial (uma vez): [docs/monitoramento.md](docs/monitoramento.md#configuração-no-github-uma-vez)
 
 ## Segurança e governança
 - IAM com menor privilégio por função: uma role por Lambda, sem `*` em ação ou recurso.
