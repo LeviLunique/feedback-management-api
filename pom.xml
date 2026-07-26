@@ -40,6 +40,14 @@
         <type>pom</type>
         <scope>import</scope>
       </dependency>
+      <!-- As extensoes Amazon nao sao gerenciadas pelo quarkus-bom principal. -->
+      <dependency>
+        <groupId>${quarkus.platform.group-id}</groupId>
+        <artifactId>quarkus-amazon-services-bom</artifactId>
+        <version>${quarkus.platform.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
     </dependencies>
   </dependencyManagement>
 
@@ -60,6 +68,16 @@
       <artifactId>quarkus-amazon-lambda-http</artifactId>
     </dependency>
 
+    <!-- Persistencia serverless -->
+    <dependency>
+      <groupId>io.quarkiverse.amazonservices</groupId>
+      <artifactId>quarkus-amazon-dynamodb</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>software.amazon.awssdk</groupId>
+      <artifactId>url-connection-client</artifactId>
+    </dependency>
+
     <!-- Observabilidade e documentacao -->
     <dependency>
       <groupId>io.quarkus</groupId>
@@ -78,6 +96,16 @@
     <dependency>
       <groupId>io.quarkus</groupId>
       <artifactId>quarkus-junit</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <!--
+      Complementa o agente do jacoco-maven-plugin: sem esta extensao, as classes
+      carregadas pelo classloader do Quarkus durante os @QuarkusTest ficam fora
+      do relatorio de cobertura.
+    -->
+    <dependency>
+      <groupId>io.quarkus</groupId>
+      <artifactId>quarkus-jacoco</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>

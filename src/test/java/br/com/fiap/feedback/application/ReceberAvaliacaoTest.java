@@ -3,10 +3,10 @@ package br.com.fiap.feedback.application;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import br.com.fiap.feedback.adapter.out.memoria.RepositorioDeFeedbackEmMemoria;
 import br.com.fiap.feedback.domain.Avaliacao;
 import br.com.fiap.feedback.domain.Urgencia;
 import br.com.fiap.feedback.domain.ValidacaoDeDominioException;
+import br.com.fiap.feedback.duble.RepositorioDeFeedbackEmMemoria;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;

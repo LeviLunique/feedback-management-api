@@ -38,8 +38,13 @@
             "header": [],
             "url": {
               "raw": "{{base_url}}/q/health",
-              "host": ["{{base_url}}"],
-              "path": ["q", "health"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "q",
+                "health"
+              ]
             },
             "description": "Verifica se a aplicação está no ar e qual build está ativa (RF-06)."
           }
@@ -65,8 +70,13 @@
             "header": [],
             "url": {
               "raw": "{{base_url}}/q/openapi",
-              "host": ["{{base_url}}"],
-              "path": ["q", "openapi"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "q",
+                "openapi"
+              ]
             },
             "description": "Documentação da API em OpenAPI 3."
           }
@@ -104,15 +114,26 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"descricao\": \"Audio com falhas graves, nao consegui acompanhar\",\n  \"nota\": 1\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/v1/avaliacao",
-              "host": ["{{base_url}}"],
-              "path": ["api", "v1", "avaliacao"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "avaliacao"
+              ]
             },
             "description": "RF-01 e RF-02: registra a avaliação e deriva a urgência da nota."
           }
@@ -135,15 +156,26 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"descricao\": \"Aula muito bem explicada, conteudo claro\",\n  \"nota\": 9\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/v1/avaliacao",
-              "host": ["{{base_url}}"],
-              "path": ["api", "v1", "avaliacao"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "avaliacao"
+              ]
             }
           }
         },
@@ -165,15 +197,26 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"descricao\": \"Tentando forjar a urgencia\",\n  \"nota\": 10,\n  \"urgencia\": \"CRITICA\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/v1/avaliacao",
-              "host": ["{{base_url}}"],
-              "path": ["api", "v1", "avaliacao"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "avaliacao"
+              ]
             },
             "description": "A urgência nunca é aceita do cliente (SPEC 4.1)."
           }
@@ -206,15 +249,26 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"descricao\": \"Nota fora do intervalo permitido\",\n  \"nota\": 11\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/v1/avaliacao",
-              "host": ["{{base_url}}"],
-              "path": ["api", "v1", "avaliacao"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "avaliacao"
+              ]
             }
           }
         },
@@ -236,15 +290,26 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"descricao\": \"   \",\n  \"nota\": 5\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/v1/avaliacao",
-              "host": ["{{base_url}}"],
-              "path": ["api", "v1", "avaliacao"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "avaliacao"
+              ]
             }
           }
         },
@@ -266,15 +331,270 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{}"
             },
             "url": {
               "raw": "{{base_url}}/api/v1/avaliacao",
-              "host": ["{{base_url}}"],
-              "path": ["api", "v1", "avaliacao"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "avaliacao"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Listar avaliações (últimos 7 dias)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', function () { pm.response.to.have.status(200); });",
+                  "var body = pm.response.json();",
+                  "pm.test('devolve itens e total', function () {",
+                  "  pm.expect(body.itens).to.be.an('array');",
+                  "  pm.expect(body).to.have.property('total');",
+                  "});",
+                  "pm.test('total corresponde a quantidade de itens', function () {",
+                  "  pm.expect(body.total).to.eql(body.itens.length);",
+                  "});",
+                  "pm.test('encontra a avaliacao registrada nesta execucao', function () {",
+                  "  var ids = body.itens.map(function (i) { return i.id; });",
+                  "  pm.expect(ids).to.include(pm.environment.get('avaliacao_id'));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/avaliacoes",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "avaliacoes"
+              ]
+            },
+            "description": "RF-05: sem filtros devolve os últimos 7 dias."
+          }
+        },
+        {
+          "name": "Filtrar por urgência CRITICA",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('todos os itens sao CRITICA', function () {",
+                  "  pm.response.json().itens.forEach(function (item) {",
+                  "    pm.expect(item.urgencia).to.eql('CRITICA');",
+                  "  });",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/avaliacoes?urgencia=CRITICA",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "avaliacoes"
+              ],
+              "query": [
+                {
+                  "key": "urgencia",
+                  "value": "CRITICA"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Período sem dados devolve lista vazia",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('lista vazia', function () {",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.itens).to.have.lengthOf(0);",
+                  "  pm.expect(body.total).to.eql(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/avaliacoes?dataInicio=2018-01-01&dataFim=2018-01-05",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "avaliacoes"
+              ],
+              "query": [
+                {
+                  "key": "dataInicio",
+                  "value": "2018-01-01"
+                },
+                {
+                  "key": "dataFim",
+                  "value": "2018-01-05"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Rejeita data em formato inválido (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', function () { pm.response.to.have.status(400); });",
+                  "pm.test('mensagem aponta dataInicio', function () {",
+                  "  pm.expect(pm.response.json().mensagens.join(' ')).to.include('dataInicio');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/avaliacoes?dataInicio=26/07/2026",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "avaliacoes"
+              ],
+              "query": [
+                {
+                  "key": "dataInicio",
+                  "value": "26/07/2026"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Rejeita urgência desconhecida (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', function () { pm.response.to.have.status(400); });",
+                  "pm.test('mensagem aponta urgencia', function () {",
+                  "  pm.expect(pm.response.json().mensagens.join(' ')).to.include('urgencia');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/avaliacoes?urgencia=URGENTISSIMA",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "avaliacoes"
+              ],
+              "query": [
+                {
+                  "key": "urgencia",
+                  "value": "URGENTISSIMA"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Rejeita período longo demais (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', function () { pm.response.to.have.status(400); });",
+                  "pm.test('mensagem aponta o periodo', function () {",
+                  "  pm.expect(pm.response.json().mensagens.join(' ')).to.include('periodo');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/avaliacoes?dataInicio=2020-01-01&dataFim=2026-12-31",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "avaliacoes"
+              ],
+              "query": [
+                {
+                  "key": "dataInicio",
+                  "value": "2020-01-01"
+                },
+                {
+                  "key": "dataFim",
+                  "value": "2026-12-31"
+                }
+              ]
             }
           }
         }
@@ -282,6 +602,9 @@
     }
   ],
   "variable": [
-    { "key": "base_url", "value": "http://localhost:8080" }
+    {
+      "key": "base_url",
+      "value": "http://localhost:8080"
+    }
   ]
 }

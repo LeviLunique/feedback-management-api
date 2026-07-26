@@ -41,6 +41,8 @@ as regras de negócio sem dependência de framework, `application` orquestra os 
 ./mvnw quarkus:dev
 ```
 Aplicação em `http://localhost:8080` (health em `/q/health`, Swagger em `/q/swagger-ui`).
+O Quarkus sobe automaticamente um container com DynamoDB via Dev Services e cria a tabela —
+não é preciso nenhuma credencial AWS para desenvolver ou rodar os testes, só o Docker ativo.
 
 ### Testes e qualidade
 ```bash
@@ -69,6 +71,7 @@ Já disponíveis:
 | Endpoint | Descrição |
 |---|---|
 | `POST /api/v1/avaliacao` | Registra avaliação `{ "descricao": string, "nota": 0..10 }` e retorna a urgência derivada |
+| `GET /api/v1/avaliacoes` | Lista avaliações do período (`dataInicio`, `dataFim`, `urgencia` — todos opcionais) |
 | `GET /q/health` | Health check com nome e versão da build ativa |
 | `GET /q/openapi` | Especificação OpenAPI 3 da API |
 | `GET /q/swagger-ui` | Swagger UI (apenas em dev) |
@@ -95,11 +98,17 @@ A urgência é sempre derivada da nota pelo servidor — notas 0–2 viram `CRIT
 6–7 `MEDIA` e 8–10 `BAIXA` — e nunca é aceita do cliente. Payloads inválidos retornam `400`
 com o corpo padrão `{ "status", "erro", "mensagens": [...] }`, acumulando todos os erros.
 
+A consulta sem filtros devolve os últimos 7 dias, no formato `{ "itens": [...], "total": n }`.
+Datas usam `yyyy-MM-dd` e o período é limitado a 366 dias:
+
+```bash
+curl "http://localhost:8080/api/v1/avaliacoes?dataInicio=2026-07-20&dataFim=2026-07-26&urgencia=CRITICA"
+```
+
 Previstos para as próximas entregas (base `/api/v1`):
 
 | Endpoint | Descrição |
 |---|---|
-| `GET /avaliacoes?dataInicio=&dataFim=&urgencia=` | Lista avaliações com filtros, para análise dos administradores |
 | `GET /relatorios/semanal?referencia=` | Agregado semanal: média das notas, totais por dia e por urgência |
 
 ## Postman
