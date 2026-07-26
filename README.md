@@ -4,10 +4,10 @@ Plataforma serverless de feedback de aulas para o Tech Challenge FIAP (Fase 4): 
 enviam avaliações, administradores recebem notificações automáticas de itens críticos e um
 relatório semanal consolidado por e-mail.
 
-> **Status**: em desenvolvimento incremental. Já estão prontos o registro e a consulta de
-> avaliações com persistência em DynamoDB, a classificação de urgência e a notificação
-> automática de feedbacks críticos por e-mail; o relatório semanal, a infraestrutura como
-> código e o pipeline de deploy vêm nas próximas entregas.
+> **Status**: em desenvolvimento incremental. Toda a regra de negócio está pronta — registro e
+> consulta de avaliações com persistência em DynamoDB, classificação de urgência, notificação
+> automática de feedbacks críticos e relatório semanal por e-mail. Faltam a infraestrutura como
+> código, o pipeline de deploy e o build nativo.
 
 ## Stack e requisitos
 - Java 21 (bytecode `--release 21`; compila com JDK 21 ou superior), Maven 3.9+ (wrapper `mvnw` incluído)
@@ -41,6 +41,7 @@ Cada função serverless é um módulo Maven com seu próprio artefato de deploy
 | `feedback-core` | — | Domínio, casos de uso e adaptadores de saída, compartilhados |
 | `feedback-api` | `feedback-intake-fn` | Recursos REST atrás do API Gateway |
 | `feedback-notification` | `urgent-notification-fn` | Consome o tópico SNS e envia o e-mail de urgência |
+| `feedback-report` | `weekly-report-fn` | Agrega a semana e envia o relatório por e-mail |
 
 A separação é imposta pelo Quarkus, que não permite a extensão HTTP e um handler Lambda
 customizado no mesmo artefato — e coincide com a responsabilidade única exigida no desafio.
@@ -89,6 +90,7 @@ Já disponíveis:
 |---|---|
 | `POST /api/v1/avaliacao` | Registra avaliação `{ "descricao": string, "nota": 0..10 }` e retorna a urgência derivada |
 | `GET /api/v1/avaliacoes` | Lista avaliações do período (`dataInicio`, `dataFim`, `urgencia` — todos opcionais) |
+| `GET /api/v1/relatorios/semanal` | Consolidado da semana (`referencia` opcional): média, totais por dia e por urgência |
 | `GET /q/health` | Health check com nome e versão da build ativa |
 | `GET /q/openapi` | Especificação OpenAPI 3 da API |
 | `GET /q/swagger-ui` | Swagger UI (apenas em dev) |
@@ -122,11 +124,21 @@ Datas usam `yyyy-MM-dd` e o período é limitado a 366 dias:
 curl "http://localhost:8080/api/v1/avaliacoes?dataInicio=2026-07-20&dataFim=2026-07-26&urgencia=CRITICA"
 ```
 
-Previstos para as próximas entregas (base `/api/v1`):
+O relatório semanal cobre de segunda a domingo — sem `referencia`, a semana corrente:
 
-| Endpoint | Descrição |
-|---|---|
-| `GET /relatorios/semanal?referencia=` | Agregado semanal: média das notas, totais por dia e por urgência |
+```bash
+curl "http://localhost:8080/api/v1/relatorios/semanal"
+```
+
+```json
+{
+  "inicio": "2026-07-20", "fim": "2026-07-26",
+  "mediaNotas": 5.0, "totalAvaliacoes": 2,
+  "avaliacoesPorDia": { "2026-07-26": 2 },
+  "avaliacoesPorUrgencia": { "CRITICA": 1, "ALTA": 0, "MEDIA": 0, "BAIXA": 1 },
+  "itens": [ { "id": "...", "descricao": "...", "nota": 1, "urgencia": "CRITICA", "dataEnvio": "..." } ]
+}
+```
 
 ## Postman
 Coleção em `postman/feedback-management-api.postman_collection.json` com testes de asserção

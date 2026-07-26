@@ -599,6 +599,156 @@
           }
         }
       ]
+    },
+    {
+      "name": "Relatórios",
+      "item": [
+        {
+          "name": "Relatório semanal (semana corrente)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', function () { pm.response.to.have.status(200); });",
+                  "var body = pm.response.json();",
+                  "pm.test('estrutura completa do relatorio', function () {",
+                  "  pm.expect(body).to.have.property('inicio');",
+                  "  pm.expect(body).to.have.property('fim');",
+                  "  pm.expect(body).to.have.property('mediaNotas');",
+                  "  pm.expect(body).to.have.property('totalAvaliacoes');",
+                  "  pm.expect(body).to.have.property('avaliacoesPorDia');",
+                  "  pm.expect(body).to.have.property('avaliacoesPorUrgencia');",
+                  "  pm.expect(body).to.have.property('itens');",
+                  "});",
+                  "pm.test('periodo vai de segunda a domingo', function () {",
+                  "  var inicio = new Date(body.inicio + 'T00:00:00Z');",
+                  "  var fim = new Date(body.fim + 'T00:00:00Z');",
+                  "  pm.expect(inicio.getUTCDay(), 'inicio na segunda').to.eql(1);",
+                  "  pm.expect(fim.getUTCDay(), 'fim no domingo').to.eql(0);",
+                  "  pm.expect((fim - inicio) / 86400000).to.eql(6);",
+                  "});",
+                  "pm.test('as quatro faixas de urgencia estao presentes', function () {",
+                  "  ['CRITICA', 'ALTA', 'MEDIA', 'BAIXA'].forEach(function (u) {",
+                  "    pm.expect(body.avaliacoesPorUrgencia).to.have.property(u);",
+                  "  });",
+                  "});",
+                  "pm.test('total corresponde a quantidade de itens', function () {",
+                  "  pm.expect(body.totalAvaliacoes).to.eql(body.itens.length);",
+                  "});",
+                  "pm.test('encontra a avaliacao registrada nesta execucao', function () {",
+                  "  var ids = body.itens.map(function (i) { return i.id; });",
+                  "  pm.expect(ids).to.include(pm.environment.get('avaliacao_id'));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/relatorios/semanal",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "relatorios",
+                "semanal"
+              ]
+            },
+            "description": "RF-04: média das avaliações, totais por dia e por urgência."
+          }
+        },
+        {
+          "name": "Relatório de semana sem dados",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', function () { pm.response.to.have.status(200); });",
+                  "var body = pm.response.json();",
+                  "pm.test('relatorio zerado, nao erro', function () {",
+                  "  pm.expect(body.totalAvaliacoes).to.eql(0);",
+                  "  pm.expect(body.mediaNotas).to.eql(0);",
+                  "  pm.expect(body.itens).to.have.lengthOf(0);",
+                  "});",
+                  "pm.test('recorte da semana da referencia', function () {",
+                  "  pm.expect(body.inicio).to.eql('2018-03-12');",
+                  "  pm.expect(body.fim).to.eql('2018-03-18');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/relatorios/semanal?referencia=2018-03-14",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "relatorios",
+                "semanal"
+              ],
+              "query": [
+                {
+                  "key": "referencia",
+                  "value": "2018-03-14"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Rejeita referência inválida (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', function () { pm.response.to.have.status(400); });",
+                  "pm.test('mensagem aponta a referencia', function () {",
+                  "  pm.expect(pm.response.json().mensagens.join(' ')).to.include('referencia');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/relatorios/semanal?referencia=26-07-2026",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "relatorios",
+                "semanal"
+              ],
+              "query": [
+                {
+                  "key": "referencia",
+                  "value": "26-07-2026"
+                }
+              ]
+            }
+          }
+        }
+      ]
     }
   ],
   "variable": [
