@@ -1,0 +1,19 @@
+{
+  "id": "c1d2e3f4-0000-4000-9000-feedback0004",
+  "name": "feedback-management-api",
+  "values": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8080",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "avaliacao_id",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    }
+  ],
+  "_postman_variable_scope": "environment"
+}
