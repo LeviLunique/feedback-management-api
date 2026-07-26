@@ -72,6 +72,213 @@
           }
         }
       ]
+    },
+    {
+      "name": "Avaliações",
+      "item": [
+        {
+          "name": "Registrar avaliação crítica (nota 1)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', function () { pm.response.to.have.status(201); });",
+                  "var body = pm.response.json();",
+                  "pm.test('devolve o recurso criado', function () {",
+                  "  pm.expect(body).to.have.property('id');",
+                  "  pm.expect(body.descricao).to.eql('Audio com falhas graves, nao consegui acompanhar');",
+                  "  pm.expect(body.nota).to.eql(1);",
+                  "});",
+                  "pm.test('nota 1 e classificada como CRITICA', function () {",
+                  "  pm.expect(body.urgencia).to.eql('CRITICA');",
+                  "});",
+                  "pm.test('data de envio em ISO-8601 UTC', function () {",
+                  "  pm.expect(body.dataEnvio).to.match(/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?Z$/);",
+                  "});",
+                  "pm.environment.set('avaliacao_id', body.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"descricao\": \"Audio com falhas graves, nao consegui acompanhar\",\n  \"nota\": 1\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/avaliacao",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "avaliacao"]
+            },
+            "description": "RF-01 e RF-02: registra a avaliação e deriva a urgência da nota."
+          }
+        },
+        {
+          "name": "Registrar avaliação positiva (nota 9)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', function () { pm.response.to.have.status(201); });",
+                  "pm.test('nota 9 e classificada como BAIXA', function () {",
+                  "  pm.expect(pm.response.json().urgencia).to.eql('BAIXA');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"descricao\": \"Aula muito bem explicada, conteudo claro\",\n  \"nota\": 9\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/avaliacao",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "avaliacao"]
+            }
+          }
+        },
+        {
+          "name": "Urgência enviada pelo cliente é ignorada",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', function () { pm.response.to.have.status(201); });",
+                  "pm.test('servidor deriva a urgencia da nota, ignorando o cliente', function () {",
+                  "  pm.expect(pm.response.json().urgencia).to.eql('BAIXA');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"descricao\": \"Tentando forjar a urgencia\",\n  \"nota\": 10,\n  \"urgencia\": \"CRITICA\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/avaliacao",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "avaliacao"]
+            },
+            "description": "A urgência nunca é aceita do cliente (SPEC 4.1)."
+          }
+        },
+        {
+          "name": "Rejeita nota fora da escala (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', function () { pm.response.to.have.status(400); });",
+                  "var body = pm.response.json();",
+                  "pm.test('corpo de erro padrao', function () {",
+                  "  pm.expect(body.status).to.eql(400);",
+                  "  pm.expect(body).to.have.property('erro');",
+                  "  pm.expect(body.mensagens).to.be.an('array').that.is.not.empty;",
+                  "});",
+                  "pm.test('mensagem aponta a nota', function () {",
+                  "  pm.expect(body.mensagens.join(' ')).to.include('nota');",
+                  "});",
+                  "pm.test('nao vaza detalhes internos', function () {",
+                  "  pm.expect(pm.response.text()).to.not.include('Exception');",
+                  "  pm.expect(pm.response.text()).to.not.include('br.com.fiap');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"descricao\": \"Nota fora do intervalo permitido\",\n  \"nota\": 11\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/avaliacao",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "avaliacao"]
+            }
+          }
+        },
+        {
+          "name": "Rejeita descrição vazia (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', function () { pm.response.to.have.status(400); });",
+                  "pm.test('mensagem aponta a descricao', function () {",
+                  "  pm.expect(pm.response.json().mensagens.join(' ')).to.include('descricao');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"descricao\": \"   \",\n  \"nota\": 5\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/avaliacao",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "avaliacao"]
+            }
+          }
+        },
+        {
+          "name": "Rejeita payload sem campos (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', function () { pm.response.to.have.status(400); });",
+                  "pm.test('acumula os dois erros de uma vez', function () {",
+                  "  pm.expect(pm.response.json().mensagens).to.have.lengthOf(2);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/avaliacao",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "avaliacao"]
+            }
+          }
+        }
+      ]
     }
   ],
   "variable": [

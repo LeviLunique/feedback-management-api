@@ -4,9 +4,10 @@ Plataforma serverless de feedback de aulas para o Tech Challenge FIAP (Fase 4): 
 enviam avaliações, administradores recebem notificações automáticas de itens críticos e um
 relatório semanal consolidado por e-mail.
 
-> **Status**: em desenvolvimento incremental. A fundação do projeto (build, testes, cobertura,
-> health check e OpenAPI) está concluída; os endpoints de avaliação, notificação e relatório
-> estão sendo entregues em fases. A seção *Endpoints* indica o que já responde.
+> **Status**: em desenvolvimento incremental. Já estão prontos a fundação do projeto (build,
+> testes, cobertura, health check e OpenAPI) e o registro de avaliações com classificação de
+> urgência; a persistência em DynamoDB, as notificações e o relatório semanal vêm nas próximas
+> entregas. A seção *Endpoints* indica o que já responde.
 
 ## Stack e requisitos
 - Java 21 (bytecode `--release 21`; compila com JDK 21 ou superior), Maven 3.9+ (wrapper `mvnw` incluído)
@@ -67,15 +68,37 @@ Já disponíveis:
 
 | Endpoint | Descrição |
 |---|---|
+| `POST /api/v1/avaliacao` | Registra avaliação `{ "descricao": string, "nota": 0..10 }` e retorna a urgência derivada |
 | `GET /q/health` | Health check com nome e versão da build ativa |
 | `GET /q/openapi` | Especificação OpenAPI 3 da API |
 | `GET /q/swagger-ui` | Swagger UI (apenas em dev) |
+
+Exemplo de registro de avaliação:
+
+```bash
+curl -X POST http://localhost:8080/api/v1/avaliacao \
+  -H 'Content-Type: application/json' \
+  -d '{"descricao":"Aula com audio ruim","nota":2}'
+```
+
+```json
+{
+  "id": "02d67b53-7f9a-43da-8c51-3b16e7ea25ac",
+  "descricao": "Aula com audio ruim",
+  "nota": 2,
+  "urgencia": "CRITICA",
+  "dataEnvio": "2026-07-26T16:21:10.527129Z"
+}
+```
+
+A urgência é sempre derivada da nota pelo servidor — notas 0–2 viram `CRITICA`, 3–5 `ALTA`,
+6–7 `MEDIA` e 8–10 `BAIXA` — e nunca é aceita do cliente. Payloads inválidos retornam `400`
+com o corpo padrão `{ "status", "erro", "mensagens": [...] }`, acumulando todos os erros.
 
 Previstos para as próximas entregas (base `/api/v1`):
 
 | Endpoint | Descrição |
 |---|---|
-| `POST /avaliacao` | Registra avaliação `{ "descricao": string, "nota": 0..10 }` e retorna a urgência derivada |
 | `GET /avaliacoes?dataInicio=&dataFim=&urgencia=` | Lista avaliações com filtros, para análise dos administradores |
 | `GET /relatorios/semanal?referencia=` | Agregado semanal: média das notas, totais por dia e por urgência |
 
