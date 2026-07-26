@@ -2,12 +2,12 @@
   "info": {
     "_postman_id": "b7f2a4a0-0000-4000-9000-feedback0004",
     "name": "feedback-management-api",
-    "description": "Coleção de testes da Feedback Management API (Tech Challenge FIAP - Fase 4). Use o environment feedback-management-api.environment.json ({{base_url}}).",
+    "description": "Coleção de testes E2E da Feedback Management API (Tech Challenge FIAP - Fase 4). Contém apenas os endpoints já implementados; cada fase do roadmap adiciona seus próprios requests. Use o environment feedback-management-api.environment.json ({{base_url}}).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
     {
-      "name": "Health",
+      "name": "Monitoramento",
       "item": [
         {
           "name": "Health check",
@@ -18,9 +18,16 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('status 200', function () { pm.response.to.have.status(200); });",
+                  "var body = pm.response.json();",
                   "pm.test('aplicacao UP', function () {",
-                  "  var body = pm.response.json();",
                   "  pm.expect(body.status).to.eql('UP');",
+                  "});",
+                  "pm.test('check da aplicacao expoe nome e versao', function () {",
+                  "  var check = body.checks.find(function (c) { return c.name === 'aplicacao'; });",
+                  "  pm.expect(check, 'check \"aplicacao\" presente').to.be.an('object');",
+                  "  pm.expect(check.status).to.eql('UP');",
+                  "  pm.expect(check.data).to.have.property('nome');",
+                  "  pm.expect(check.data).to.have.property('versao');",
                   "});"
                 ]
               }
@@ -33,142 +40,12 @@
               "raw": "{{base_url}}/q/health",
               "host": ["{{base_url}}"],
               "path": ["q", "health"]
-            }
-          }
-        }
-      ]
-    },
-    {
-      "name": "Avaliações",
-      "item": [
-        {
-          "name": "Criar avaliação (crítica)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('status 201', function () { pm.response.to.have.status(201); });",
-                  "var body = pm.response.json();",
-                  "pm.test('retorna id, urgencia e dataEnvio', function () {",
-                  "  pm.expect(body).to.have.property('id');",
-                  "  pm.expect(body).to.have.property('urgencia');",
-                  "  pm.expect(body).to.have.property('dataEnvio');",
-                  "});",
-                  "pm.test('nota 1 gera urgencia CRITICA', function () {",
-                  "  pm.expect(body.urgencia).to.eql('CRITICA');",
-                  "});",
-                  "pm.environment.set('avaliacao_id', body.id);"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"descricao\": \"Aula com problemas graves de áudio, impossível acompanhar.\",\n  \"nota\": 1\n}"
             },
-            "url": {
-              "raw": "{{base_url}}/api/v1/avaliacao",
-              "host": ["{{base_url}}"],
-              "path": ["api", "v1", "avaliacao"]
-            }
+            "description": "Verifica se a aplicação está no ar e qual build está ativa (RF-06)."
           }
         },
         {
-          "name": "Criar avaliação (positiva)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('status 201', function () { pm.response.to.have.status(201); });",
-                  "pm.test('nota 9 gera urgencia BAIXA', function () {",
-                  "  pm.expect(pm.response.json().urgencia).to.eql('BAIXA');",
-                  "});"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"descricao\": \"Excelente aula, conteúdo muito claro.\",\n  \"nota\": 9\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/api/v1/avaliacao",
-              "host": ["{{base_url}}"],
-              "path": ["api", "v1", "avaliacao"]
-            }
-          }
-        },
-        {
-          "name": "Criar avaliação - nota inválida (400)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('status 400', function () { pm.response.to.have.status(400); });",
-                  "pm.test('corpo de erro padrao', function () {",
-                  "  var body = pm.response.json();",
-                  "  pm.expect(body).to.have.property('status');",
-                  "  pm.expect(body).to.have.property('mensagens');",
-                  "});"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"descricao\": \"Nota fora do intervalo permitido.\",\n  \"nota\": 11\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/api/v1/avaliacao",
-              "host": ["{{base_url}}"],
-              "path": ["api", "v1", "avaliacao"]
-            }
-          }
-        },
-        {
-          "name": "Criar avaliação - descrição vazia (400)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('status 400', function () { pm.response.to.have.status(400); });"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"descricao\": \"\",\n  \"nota\": 5\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/api/v1/avaliacao",
-              "host": ["{{base_url}}"],
-              "path": ["api", "v1", "avaliacao"]
-            }
-          }
-        },
-        {
-          "name": "Listar avaliações",
+          "name": "OpenAPI",
           "event": [
             {
               "listen": "test",
@@ -176,10 +53,8 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('status 200', function () { pm.response.to.have.status(200); });",
-                  "pm.test('retorna itens e total', function () {",
-                  "  var body = pm.response.json();",
-                  "  pm.expect(body).to.have.property('itens');",
-                  "  pm.expect(body).to.have.property('total');",
+                  "pm.test('especificacao publicada', function () {",
+                  "  pm.expect(pm.response.text()).to.include('Feedback Management API');",
                   "});"
                 ]
               }
@@ -189,77 +64,11 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{base_url}}/api/v1/avaliacoes",
+              "raw": "{{base_url}}/q/openapi",
               "host": ["{{base_url}}"],
-              "path": ["api", "v1", "avaliacoes"]
-            }
-          }
-        },
-        {
-          "name": "Listar avaliações críticas",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('status 200', function () { pm.response.to.have.status(200); });",
-                  "pm.test('todos os itens sao CRITICA', function () {",
-                  "  var body = pm.response.json();",
-                  "  body.itens.forEach(function (item) {",
-                  "    pm.expect(item.urgencia).to.eql('CRITICA');",
-                  "  });",
-                  "});"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/v1/avaliacoes?urgencia=CRITICA",
-              "host": ["{{base_url}}"],
-              "path": ["api", "v1", "avaliacoes"],
-              "query": [{ "key": "urgencia", "value": "CRITICA" }]
-            }
-          }
-        }
-      ]
-    },
-    {
-      "name": "Relatórios",
-      "item": [
-        {
-          "name": "Relatório semanal",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('status 200', function () { pm.response.to.have.status(200); });",
-                  "pm.test('estrutura do relatorio', function () {",
-                  "  var body = pm.response.json();",
-                  "  pm.expect(body).to.have.property('inicio');",
-                  "  pm.expect(body).to.have.property('fim');",
-                  "  pm.expect(body).to.have.property('mediaNotas');",
-                  "  pm.expect(body).to.have.property('totalAvaliacoes');",
-                  "  pm.expect(body).to.have.property('avaliacoesPorDia');",
-                  "  pm.expect(body).to.have.property('avaliacoesPorUrgencia');",
-                  "});"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/v1/relatorios/semanal",
-              "host": ["{{base_url}}"],
-              "path": ["api", "v1", "relatorios", "semanal"]
-            }
+              "path": ["q", "openapi"]
+            },
+            "description": "Documentação da API em OpenAPI 3."
           }
         }
       ]

@@ -37,6 +37,9 @@ else
   EXTRA_ARGS+=(--env-var "base_url=$DEFAULT_BASE_URL")
 fi
 
+# A tag 6-alpine possui builds nativos para amd64 e arm64 (Apple Silicon).
+NEWMAN_IMAGE="${NEWMAN_IMAGE:-postman/newman:6-alpine}"
+
 PLATFORM_ARG=()
 if [[ -n "${NEWMAN_PLATFORM:-}" ]]; then
   PLATFORM_ARG+=(--platform "${NEWMAN_PLATFORM}")
@@ -44,7 +47,7 @@ fi
 
 docker run --rm ${PLATFORM_ARG+"${PLATFORM_ARG[@]}"} ${NETWORK_ARG+"${NETWORK_ARG[@]}"} \
   --add-host=host.docker.internal:host-gateway \
-  -v "$ROOT_DIR:/etc/newman" postman/newman:5-alpine \
+  -v "$ROOT_DIR:/etc/newman" "$NEWMAN_IMAGE" \
   run /etc/newman/postman/feedback-management-api.postman_collection.json \
   -e /etc/newman/postman/feedback-management-api.environment.json \
   --reporters cli \

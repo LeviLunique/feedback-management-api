@@ -4,9 +4,13 @@ Plataforma serverless de feedback de aulas para o Tech Challenge FIAP (Fase 4): 
 enviam avaliações, administradores recebem notificações automáticas de itens críticos e um
 relatório semanal consolidado por e-mail.
 
+> **Status**: em desenvolvimento incremental. A fundação do projeto (build, testes, cobertura,
+> health check e OpenAPI) está concluída; os endpoints de avaliação, notificação e relatório
+> estão sendo entregues em fases. A seção *Endpoints* indica o que já responde.
+
 ## Stack e requisitos
-- Java 21, Maven 3.9+ (wrapper `mvnw` incluído)
-- Quarkus 3.x compilado nativo com GraalVM (Mandrel) para AWS Lambda
+- Java 21 (bytecode `--release 21`; compila com JDK 21 ou superior), Maven 3.9+ (wrapper `mvnw` incluído)
+- Quarkus 3.37 compilado nativo com GraalVM (Mandrel) para AWS Lambda
 - AWS: Lambda, API Gateway (HTTP API), DynamoDB, SNS, SES, EventBridge Scheduler, CloudWatch
 - IaC com AWS SAM (`infra/template.yaml`) e deploy automatizado via GitHub Actions (OIDC)
 - Docker (Testcontainers, Newman e build nativo em container)
@@ -23,7 +27,11 @@ Três funções serverless, cada uma com responsabilidade única:
 | `weekly-report-fn` | EventBridge (cron semanal) | Agregar a semana e enviar o relatório por e-mail (SES) |
 
 Avaliações são persistidas no DynamoDB; notas 0–2 são classificadas como urgência `CRITICA`
-e disparam a notificação. Detalhes, decisões e modelo de cloud: [docs/arquitetura.md](docs/arquitetura.md).
+e disparam a notificação.
+
+O código segue arquitetura hexagonal (ports & adapters) em módulo único: `domain` concentra
+as regras de negócio sem dependência de framework, `application` orquestra os casos de uso e
+`adapter.in` / `adapter.out` isolam HTTP, DynamoDB, SNS e SES.
 
 ## Como executar
 
@@ -35,32 +43,46 @@ Aplicação em `http://localhost:8080` (health em `/q/health`, Swagger em `/q/sw
 
 ### Testes e qualidade
 ```bash
-./mvnw verify   # unit + integração (Testcontainers) + gate de cobertura JaCoCo >= 80%
+./mvnw verify
 ```
-Relatório de cobertura em `target/site/jacoco/index.html`.
+Executa os testes unitários e de integração e aplica o gate de cobertura do JaCoCo: o build
+**falha** se a cobertura de linhas ficar abaixo de 80%. Relatório em
+`target/site/jacoco/index.html`.
 
 ### Deploy na AWS
 ```bash
 sam build && sam deploy --guided   # primeira vez; depois: sam deploy
 ```
 O push em `main` também dispara o deploy automatizado via GitHub Actions.
+> Disponível a partir da entrega de infraestrutura como código; veja o *Status* no topo.
 
 ### Variáveis de ambiente principais
 - `AWS_PROFILE`, `AWS_REGION` — credenciais/região do deploy
 - `SENDER_EMAIL` — remetente verificado no SES
 - `ADMIN_EMAILS` — destinatários das notificações e do relatório semanal
 
-## Endpoints principais (base `/api/v1`)
-- `POST /avaliacao` – registra avaliação `{ "descricao": string, "nota": 0..10 }`; retorna urgência derivada.
-- `GET /avaliacoes?dataInicio=&dataFim=&urgencia=` – lista avaliações com filtros (análise dos admins).
-- `GET /relatorios/semanal?referencia=` – agregado semanal (média, totais por dia e por urgência).
-- Health: `/q/health`
-- OpenAPI: `/q/openapi` · Swagger UI (dev): `/q/swagger-ui`
+## Endpoints
+
+Já disponíveis:
+
+| Endpoint | Descrição |
+|---|---|
+| `GET /q/health` | Health check com nome e versão da build ativa |
+| `GET /q/openapi` | Especificação OpenAPI 3 da API |
+| `GET /q/swagger-ui` | Swagger UI (apenas em dev) |
+
+Previstos para as próximas entregas (base `/api/v1`):
+
+| Endpoint | Descrição |
+|---|---|
+| `POST /avaliacao` | Registra avaliação `{ "descricao": string, "nota": 0..10 }` e retorna a urgência derivada |
+| `GET /avaliacoes?dataInicio=&dataFim=&urgencia=` | Lista avaliações com filtros, para análise dos administradores |
+| `GET /relatorios/semanal?referencia=` | Agregado semanal: média das notas, totais por dia e por urgência |
 
 ## Postman
-Coleção pronta em `postman/feedback-management-api.postman_collection.json` com testes de
-asserção para todos os endpoints. Importe a coleção e o environment
-`postman/feedback-management-api.environment.json`.
+Coleção em `postman/feedback-management-api.postman_collection.json` com testes de asserção
+para os endpoints já implementados — cada entrega adiciona os seus. Importe a coleção junto
+com o environment `postman/feedback-management-api.environment.json`.
 
 ### Testes automatizados via Newman (Docker)
 ```bash
@@ -69,21 +91,23 @@ asserção para todos os endpoints. Importe a coleção e o environment
 ```
 - Por padrão roda contra `http://host.docker.internal:8080` (app local).
 - Para rodar contra a AWS: `BASE_URL="https://<api-id>.execute-api.us-east-1.amazonaws.com" ./scripts/run-postman.sh`.
-- Em Apple Silicon, para eliminar o aviso de plataforma: `NEWMAN_PLATFORM=linux/arm64/v8 ./scripts/run-postman.sh`.
+- Usa a imagem `postman/newman:6-alpine`, com builds nativos para amd64 e arm64 (Apple Silicon).
+  Para trocar a imagem: `NEWMAN_IMAGE=postman/newman:alpine ./scripts/run-postman.sh`.
 
 ## Monitoramento
 - Logs estruturados (JSON) no CloudWatch Logs, retenção de 14 dias.
 - Alarmes de erro por função e 5XX do API Gateway com notificação por e-mail.
 - Dashboard CloudWatch com invocações, erros e duração p95.
-- Detalhes: [docs/monitoramento.md](docs/monitoramento.md)
+- Health check em `/q/health` expõe o nome e a versão da build ativa em cada função.
 
 ## Segurança e governança
 - IAM com menor privilégio por função (uma role por Lambda, sem `*`).
 - Deploy do CI via OIDC (sem access keys de longa duração).
 - TLS no API Gateway, criptografia em repouso no DynamoDB, throttling de requisições.
-- Detalhes: [docs/seguranca.md](docs/seguranca.md)
+- Nenhuma credencial no código: configuração por variáveis de ambiente e parâmetros da stack.
 
 ## Troubleshooting
-- **Build nativo falhando local**: use o build em container — `./mvnw package -Dnative -Dquarkus.native.container-build=true`.
+- **Build nativo falhando local**: use o build em container — `./mvnw package -Dnative` (o profile
+  `native` já ativa `quarkus.native.container-build`, dispensando o GraalVM instalado na máquina).
 - **SES não envia e-mail**: conta em sandbox — verifique remetente e destinatários (`aws ses verify-email-identity`).
 - **Testcontainers sem Docker**: garanta o Docker Desktop ativo antes do `./mvnw verify`.

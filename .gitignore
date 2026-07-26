@@ -42,13 +42,14 @@ samconfig.toml.bak
 *.iws
 *.iml
 *.ipr
-out/
+# Ancorado na raiz: "out/" solto excluiria o pacote adapter/out do codigo-fonte.
+/out/
 
 # Eclipse
 .classpath
 .project
 .settings/
-bin/
+/bin/
 
 # VS Code
 .vscode/
