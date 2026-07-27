@@ -25,7 +25,9 @@ jobs:
     # e especifico de arquitetura. Compilar em x86_64 geraria um artefato que o
     # Lambda nao consegue executar.
     runs-on: ubuntu-24.04-arm
-    timeout-minutes: 60
+    # Compilar tres binarios nativos leva ~35 min; somados testes e deploy, 60
+    # minutos ficariam no limite.
+    timeout-minutes: 90
 
     steps:
       - name: Obter o codigo
