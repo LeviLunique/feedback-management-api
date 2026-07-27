@@ -40,6 +40,27 @@ jobs:
           java-version: '21'
           cache: maven
 
+      # A autenticacao vem ANTES da compilacao de proposito: um segredo errado
+      # ou uma politica de confianca incorreta falham em segundos, em vez de
+      # depois de 40 minutos compilando binarios nativos. A sessao dura 3 horas
+      # para cobrir todo o build.
+      - name: Assumir a role de deploy via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
+          role-session-name: github-actions-deploy
+          role-duration-seconds: 10800
+
+      - name: Conferir o acesso a AWS
+        # Falha barata que confirma que a role foi assumida de fato.
+        run: aws sts get-caller-identity
+
+      - name: Preparar o SAM CLI
+        uses: aws-actions/setup-sam@v2
+        with:
+          use-installer: true
+
       - name: Testes e gate de cobertura
         run: ./mvnw -B --no-transfer-progress verify
 
@@ -47,18 +68,6 @@ jobs:
         # O profile native ja compila em container Mandrel, dispensando o
         # GraalVM instalado no runner.
         run: ./mvnw -B --no-transfer-progress package -Dnative -DskipTests
-
-      - name: Assumir a role de deploy via OIDC
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
-          role-session-name: github-actions-deploy
-
-      - name: Preparar o SAM CLI
-        uses: aws-actions/setup-sam@v2
-        with:
-          use-installer: true
 
       - name: Publicar a stack
         working-directory: infra

@@ -43,7 +43,9 @@ Resources:
     Properties:
       RoleName: !Sub '${NomeDaStackDaAplicacao}-github-deploy'
       Description: Publica a stack da aplicacao a partir do GitHub Actions.
-      MaxSessionDuration: 3600
+      # 3 horas: as credenciais sao obtidas no inicio do job, e a compilacao dos
+      # tres binarios nativos leva cerca de 40 minutos antes do deploy comecar.
+      MaxSessionDuration: 10800
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -98,6 +100,10 @@ Resources:
                 Resource:
                   - !Sub 'arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${NomeDaStackDaAplicacao}/*'
                   - !Sub 'arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${NomeDaStackDaAplicacao}-*/*'
+                  # O SAM mantem em uma stack propria o bucket de artefatos do
+                  # deploy (resolve_s3). Sem esta entrada, ele nao consegue
+                  # criar nem atualizar esse bucket a partir do pipeline.
+                  - !Sub 'arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/aws-sam-cli-managed-default/*'
               - Effect: Allow
                 Action: cloudformation:ValidateTemplate
                 Resource: '*'
