@@ -53,10 +53,26 @@ Resources:
             Action: sts:AssumeRoleWithWebIdentity
             Condition:
               StringEquals:
-                # Confia apenas neste repositorio e neste branch: um fork ou outro
-                # branch do mesmo repositorio nao consegue assumir a role.
                 token.actions.githubusercontent.com:aud: sts.amazonaws.com
-                token.actions.githubusercontent.com:sub: !Sub 'repo:${GitHubRepo}:ref:refs/heads/${BranchDeDeploy}'
+              # Confia apenas neste repositorio e neste branch: um fork ou outro
+              # branch do mesmo repositorio nao consegue assumir a role.
+              #
+              # Sao aceitos os dois formatos de subject claim do GitHub:
+              #   classico : repo:dono/nome:ref:refs/heads/main
+              #   imutavel : repo:dono@<id>/nome@<id>:ref:refs/heads/main
+              # O formato imutavel embute os IDs numericos para resistir a
+              # renomeacao, e algumas contas ja o emitem por padrao.
+              #
+              # O curinga so cobre o sufixo de ID: logins e nomes de repositorio
+              # no GitHub nao podem conter '@', entao 'dono@*' nao casa com
+              # nenhum outro dono.
+              StringLike:
+                token.actions.githubusercontent.com:sub:
+                  - !Sub 'repo:${GitHubRepo}:ref:refs/heads/${BranchDeDeploy}'
+                  - !Sub
+                    - 'repo:${Dono}@*/${Nome}@*:ref:refs/heads/${BranchDeDeploy}'
+                    - Dono: !Select [0, !Split ['/', !Ref GitHubRepo]]
+                      Nome: !Select [1, !Split ['/', !Ref GitHubRepo]]
       Policies:
         - PolicyName: publicar-stack-da-aplicacao
           PolicyDocument:
