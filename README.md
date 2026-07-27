@@ -1,12 +1,14 @@
 # Feedback Management API
 
+> **Tech Challenge - Fase 4 | Pos Tech FIAP - Arquitetura e Desenvolvimento Java**
+>
+> Autor: **Levi Lunique Izidio da Silva**
+> 
+> Matricula: **RM370139**
+
 Plataforma serverless de feedback de aulas para o Tech Challenge FIAP (Fase 4): estudantes
 enviam avaliações, administradores recebem notificações automáticas de itens críticos e um
 relatório semanal consolidado por e-mail.
-
-> **Status**: solução completa e publicada na AWS. As três funções rodam como binário nativo
-> GraalVM, com cold start medido em **0,55 s**. Suíte E2E validada contra o ambiente publicado:
-> 17 requisições, 46 asserções, 0 falhas.
 
 ## Atendimento aos requisitos
 
@@ -224,9 +226,6 @@ com o environment `postman/feedback-management-api.environment.json`.
 - Log de acesso do API Gateway sem corpo de requisição: o texto do aluno não vai para o log.
 - Nenhuma credencial no código: configuração por variáveis de ambiente e parâmetros da stack.
 - Detalhes e limitações conhecidas: [docs/seguranca.md](docs/seguranca.md)
-
-## Vídeo de demonstração
-Roteiro sugerido, com os comandos prontos: [docs/roteiro-do-video.md](docs/roteiro-do-video.md)
 
 ## Troubleshooting
 - **Build nativo falhando local**: use o build em container — `./mvnw package -Dnative` (o profile
