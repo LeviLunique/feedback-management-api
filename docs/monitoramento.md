@@ -69,8 +69,22 @@ A URL sai como output da stack (`PainelCloudWatch`) após o deploy.
 
 ## 4. Rastreamento
 
-As funções sobem com `Tracing: Active` (AWS X-Ray), permitindo seguir uma requisição desde o
-API Gateway até a chamada ao DynamoDB ou ao SNS e identificar onde o tempo foi gasto.
+As funções sobem com `Tracing: Active` (AWS X-Ray). Cada invocação gera um trace com a duração
+total e os subsegmentos `Init` e `Overhead` — o `Init` é justamente o cold start, o que torna o
+X-Ray o lugar mais direto para comprovar o ganho do binário nativo.
+
+**O que o trace não mostra, e por quê:**
+
+- **Não há segmento do API Gateway.** O X-Ray é suportado pela REST API, não pela HTTP API.
+  Escolhemos a HTTP API por custo e latência (ver [arquitetura.md](arquitetura.md) §3), e o
+  rastreamento do gateway é o preço dessa escolha.
+- **Não há subsegmentos de DynamoDB, SNS ou SES.** O `Tracing: Active` instrumenta a invocação
+  da função, mas rastrear chamadas de saída exige instrumentar o SDK da AWS — na prática,
+  adicionar `quarkus-opentelemetry` com o exporter X-Ray e registrar os clientes.
+
+Para uma visão ponta a ponta, o caminho seria trocar para REST API e instrumentar o SDK. Não
+fizemos porque a latência por serviço já é observável no painel do CloudWatch, e o custo não se
+justificava neste escopo.
 
 ## 5. Entrega contínua
 
