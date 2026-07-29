@@ -10,6 +10,8 @@ Plataforma serverless de feedback de aulas para o Tech Challenge FIAP (Fase 4): 
 enviam avaliações, administradores recebem notificações automáticas de itens críticos e um
 relatório semanal consolidado por e-mail.
 
+🎬 **Vídeo de demonstração:** https://youtu.be/DUDCdnXqQ5g
+
 ## Atendimento aos requisitos
 
 | Requisito do desafio | Onde está | Situação |
